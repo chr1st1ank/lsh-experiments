@@ -14,18 +14,19 @@ import xxhash
 
 def hash32(data):
     """A 32-bit hash function based on SHA1."""
-    return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
+    # return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
     # return struct.unpack("<Q", hashlib.sha1(data).digest()[:8])[0]
     # return int(hashlib.sha1(data).hexdigest()[:16], 16)
     # return murmurhash.mrmr.hash(data)
-    # return xxhash.xxh32(data).intdigest()
-    return struct.unpack("<I", xxhash.xxh32(data).digest()[:4])[0]
+    return int(xxhash.xxh32(data).hexdigest(), 16)
+    return xxhash.xxh32(data).intdigest()
+    # return struct.unpack("<I", xxhash.xxh32(data).digest()[:4])[0]
 
 
-def make_minhash_generator(n_hashes=100, random_seed=1):
-    _mersenne_prime = np.uint64((1 << 61) - 1)
-    # _mersenne_prime = np.uint64((1 << 32) - 1)
-    _max_hash = np.uint64((1 << 32) - 1)
+def make_minhash_generator(n_hashes=100, random_seed=42):
+    # _mersenne_prime = np.uint64((1 << 61) - 1)
+    _mersenne_prime = np.uint32((1 << 32) - 1)
+    _max_hash = np.uint32((1 << 32) - 1)
     # random.seed(random_seed)
     # params = [
     #     (random.randint(0, _mersenne_prime), random.randint(0, _mersenne_prime))
@@ -34,22 +35,18 @@ def make_minhash_generator(n_hashes=100, random_seed=1):
     gen = np.random.RandomState(random_seed)
     params = [
         (
-            gen.randint(1, _mersenne_prime, dtype=np.uint64),
-            gen.randint(0, _mersenne_prime, dtype=np.uint64),
+            gen.randint(1, _mersenne_prime, dtype=np.uint32),
+            gen.randint(0, _mersenne_prime, dtype=np.uint32),
         )
         for _ in range(n_hashes)
     ]
 
     def calc_minhashes(shingles: List[str]) -> np.array:
         hashes = np.array(
-            [hash32(s.encode("utf-8")) for s in shingles], dtype=np.uint64
+            [hash32(s.encode("utf-8")) for s in shingles], dtype=np.uint32
         )
-        hashes = np.bitwise_and(
-            np.array([(a * hashes + b) % _mersenne_prime for a, b in params]), _max_hash
-        )
-        # print(hashes)
+        hashes = np.array([(a * hashes + b) % _mersenne_prime for a, b in params])
         minhashes = np.min(hashes, axis=1)
-        # print(minhashes)
         return minhashes
 
     return calc_minhashes
