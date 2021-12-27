@@ -1,19 +1,15 @@
 import collections
-import hashlib
-import itertools
-import random
-import struct
-import sys
-from typing import Iterable, List, Set
+from typing import List
 
 import numpy as np
-from numpy.random import default_rng
-import murmurhash.mrmr
+# import murmurhash.mrmr
 import xxhash
+from numpy.random import default_rng
 
 
 def hash32(data):
     """A 32-bit hash function based on SHA1."""
+    # return binascii.crc32(data) & 0xffffffff
     # return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
     # return struct.unpack("<Q", hashlib.sha1(data).digest()[:8])[0]
     # return int(hashlib.sha1(data).hexdigest()[:16], 16)
@@ -27,26 +23,17 @@ def make_minhash_generator(n_hashes=100, random_seed=42):
     # _mersenne_prime = np.uint64((1 << 61) - 1)
     _mersenne_prime = np.uint32((1 << 32) - 1)
     _max_hash = np.uint32((1 << 32) - 1)
-    # random.seed(random_seed)
-    # params = [
-    #     (random.randint(0, _mersenne_prime), random.randint(0, _mersenne_prime))
-    #     for _ in range(n_hashes)
-    # ]
     gen = np.random.RandomState(random_seed)
-    params = [
-        (
-            gen.randint(1, _mersenne_prime, dtype=np.uint32),
-            gen.randint(0, _mersenne_prime, dtype=np.uint32),
-        )
-        for _ in range(n_hashes)
-    ]
+    A = gen.randint(1, _mersenne_prime, size=n_hashes, dtype='uint32')
+    B = gen.randint(0, _mersenne_prime, size=n_hashes, dtype='uint32')
 
     def calc_minhashes(shingles: List[str]) -> np.array:
         hashes = np.array(
             [hash32(s.encode("utf-8")) for s in shingles], dtype=np.uint32
         )
-        hashes = np.array([(a * hashes + b) % _mersenne_prime for a, b in params])
-        minhashes = np.min(hashes, axis=1)
+        hashes = hashes.repeat(A.shape[0]).reshape(hashes.shape[0], A.shape[0])
+        hashes = (A * hashes + B) % _mersenne_prime
+        minhashes = np.min(hashes, axis=0)
         return minhashes
 
     return calc_minhashes
