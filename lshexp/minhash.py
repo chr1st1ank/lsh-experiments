@@ -59,7 +59,8 @@ class LSH:
         self.rows_per_band = n_hashes // bands
         self.bands = [{} for _ in range(self.n_bands)]
         self.values = []
-        self._hashfunc = murmurhash.mrmr.hash
+        self._hashfunc = hash32
+        # self._hashfunc = murmurhash.mrmr.hash
 
     def insert(self, minhashes: np.array, value):
         value_index = len(self.values)
@@ -69,6 +70,8 @@ class LSH:
             h = self._hash(minhashes[start_index : start_index + self.rows_per_band])
             self.bands[band_number].setdefault(h, set()).update([value_index])
 
+    # TODO: def remove(self, minhashes)
+
     def query(self, minhashes: np.array):
         candidates = collections.Counter()
         for band_number in range(self.n_bands):
@@ -76,6 +79,14 @@ class LSH:
             h = self._hash(minhashes[start_index : start_index + self.rows_per_band])
             candidates.update(self.bands[band_number].get(h, set()))
         return set(self.values[c] for c in candidates)
+
+    def best_hits(self, minhashes: np.array):
+        candidates = collections.Counter()
+        for band_number in range(self.n_bands):
+            start_index = band_number * self.rows_per_band
+            h = self._hash(minhashes[start_index : start_index + self.rows_per_band])
+            candidates.update(self.bands[band_number].get(h, set()))
+        return [self.values[key] for key, count in candidates.most_common()]
 
     def _hash(self, arr: np.array):
         """Merge multiple hashes together to one hash per band"""
